@@ -28,7 +28,7 @@ jobs:
 
     - name: fetch webrtc
       run: |
-          export PATH=/opt/arm-toolchain/armv5-eabi--uclibc--stable-2017.05-toolchains-1-1/armv5-eabi--uclibc--stable/bin:$PATH
+          export PATH=/opt/arm-toolchain/armv5-eabi--uclibc--stable/bin:$PATH
           mkdir webrtc
           pushd webrtc
           fetch --no-history --nohooks webrtc
@@ -39,7 +39,7 @@ jobs:
 
     - name: build
       run: |
-          export PATH=/opt/arm-toolchain/armv5-eabi--uclibc--stable-2017.05-toolchains-1-1/armv5-eabi--uclibc--stable/bin:$PATH
+          export PATH=/opt/arm-toolchain/armv5-eabi--uclibc--stable/bin:$PATH
           cmake -DWEBRTCROOT=$(pwd)/webrtc -DCMAKE_BUILD_TYPE=${{ matrix.buildtype }} -DCMAKE_SYSTEM_PROCESSOR=arm -DCMAKE_SYSTEM_NAME=linux-gnueabi -DCMAKE_C_COMPILER=arm-linux-gnueabi-gcc -DCMAKE_CXX_COMPILER=arm-linux-gnueabi-g++ -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY -DWEBRTCDESKTOPCAPTURE=OFF .
           make VERBOSE=1
 
