@@ -51,7 +51,7 @@ jobs:
             mkdir webrtc
             pushd webrtc
             fetch --no-history --nohooks webrtc
-            ./src/build/linux/sysroot_scripts/install-sysroot.py --arch=armv5l
+            ./src/build/linux/sysroot_scripts/install-sysroot.py --arch=arm
             sed -i -e "s|'src/resources'],|'src/resources'],'condition':'rtc_include_tests==true',|" src/DEPS 
             gclient sync 
             popd
