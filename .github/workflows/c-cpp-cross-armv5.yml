@@ -1,0 +1,79 @@
+name: C/C++ CI 
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: pkg       
+      run:  sudo apt-get update 
+            sudo apt-get install -y --no-install-recommends g++ autoconf automake libtool xz-utils libasound2-dev libpulse-dev libgtk-3-dev cmake p7zip-full
+            mkdir -p /opt/musl_gcc 
+            echo -e "\n\033[42;31;5;1m 开始下载armv5l-linux-musleabi-cross工具链.. \n\033[0m"
+            wget -q -c https://musl.cc/armv5l-linux-musleabi-cross.tgz -P /opt/musl_gcc/
+            echo -e "\n\033[42;31;5;1m 开始解压armv5l-linux-musleabi-cross工具链.. \n\033[0m"
+            tar -xf /opt/musl_gcc/armv5l-linux-musleabi-cross.tgz -C /opt/musl_gcc/
+            echo -e "\n\033[42;31;5;1m 查看armv5l-linux-musleabi-gcc信息 \n\033[0m"
+            /opt/musl_gcc/armv5l-linux-musleabi-cross/bin/armv5l-linux-musleabi-gcc -v
+            sudo timedatectl set-timezone "Asia/Shanghai"     
+    - name: depot_tools
+      run: |
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$(pwd)/depot_tools" >> $GITHUB_PATH
+
+    - name: fetch webrtc
+      run: |
+            export PATH=$PATH:/opt/musl_gcc/armv5l-linux-musleabi-cross/bin
+            export CORSS_PREFI=/opt/musl_gcc/armv5l-linux-musleabi-cross/bin/armv5l-linux-musleabi-
+            export CC=/opt/musl_gcc/armv5l-linux-musleabi-cross/bin/armv5l-linux-musleabi-gcc
+            export CXX=/opt/musl_gcc/armv5l-linux-musleabi-cross/bin/armv5l-linux-musleabi-g++
+            export RANLIB=/opt/musl_gcc/armv5l-linux-musleabi-cross/bin/armv5l-linux-musleabi-ranlib
+            export LD=/opt/musl_gcc/armv5l-linux-musleabi-cross/bin/armv5l-linux-musleabi-ld
+            export AR=/opt/musl_gcc/armv5l-linux-musleabi-cross/bin/armv5l-linux-musleabi-ar
+            export STRIP=/opt/musl_gcc/armv5l-linux-musleabi-cross/bin/armv5l-linux-musleabi-strip
+            export CFLAGS="-I /opt/musl_gcc/armv5l-linux-musleabi-cross/armv5l-linux-musleabi/include -L /opt/musl_gcc/armv5l-linux-musleabi-cross/armv5l-linux-musleabi/lib -Wl,--gc-sections -Os -ffunction-sections -fdata-sections -D_GNU_SOURCE -D_BSD_SOUR -fPIE"
+            export CXXFLAGS="$CFLAGS"
+            echo -e "\n\033[42;31;5;1m 开始编译... \n\033[0m"
+            CC=armv5l-linux-musleabi-gcc \
+            STRIP=armv5l-linux-musleabi-strip \
+            ZT_STATIC=1 \
+            DEFS="" \
+            OSTYPE="Linux" \
+            mkdir webrtc
+            pushd webrtc
+            fetch --no-history --nohooks webrtc
+            ./src/build/linux/sysroot_scripts/install-sysroot.py --arch=armv5l
+            sed -i -e "s|'src/resources'],|'src/resources'],'condition':'rtc_include_tests==true',|" src/DEPS 
+            gclient sync 
+            popd
+            cmake -DWEBRTCROOT=$(pwd)/webrtc -DCMAKE_BUILD_TYPE=${{ matrix.buildtype }} -DCMAKE_SYSTEM_PROCESSOR=armv5l -DCMAKE_SYSTEM_NAME=linux-musleabi -DCMAKE_C_COMPILER=armv5l-linux-musleabi-gcc -DCMAKE_CXX_COMPILER=armv5l-linux-musleabi-g++ -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY -DWEBRTCDESKTOPCAPTURE=OFF .
+            make VERBOSE=1
+
+    - name: cpack 
+      run: | 
+          rm -f *.tar.gz
+          cpack
+          echo "artifactPath=$(ls *.tar.gz)" >> $GITHUB_ENV
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: ${{ env.artifactPath }}
+        path: ${{ env.artifactPath }}   
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: ${{ env.artifactPath }}
+    - name: make check
+      run: make check
+    - name: make distcheck
+      run: make distcheck
